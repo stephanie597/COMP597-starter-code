@@ -166,7 +166,7 @@ def fakeimagenet_args():
     parser.add_argument("--test", default=0.1, type=float)
     parser.add_argument("--output", default=os.getenv("MILABENCH_DIR_DATA", None), type=str)
 
-    # ✅ NEW: size cap
+    # NEW: size cap
     parser.add_argument(
         "--max-size-gb",
         default=None,

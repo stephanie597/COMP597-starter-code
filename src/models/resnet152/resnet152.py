@@ -73,6 +73,8 @@ def resnet152_init(conf: config.Config, dataset: data.Dataset) -> Tuple[Trainer,
     print("[ResNet152] Loading ResNet152 backbone...")
     backbone = tvmodels.resnet152(weights=None)
     num_classes = backbone.fc.out_features
+    # num_classes = len(dataset.features["label"].names)
+    # backbone.fc = nn.Linear(backbone.fc.in_features, num_classes)
     
     model = ResNetWithLoss(backbone, num_classes=num_classes)
     model = model.to(device)
@@ -92,20 +94,58 @@ def resnet152_init(conf: config.Config, dataset: data.Dataset) -> Tuple[Trainer,
     lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: 1.0)
 
     # 5) Create statistics tracker
-    # ✅ DEFAULT to resource_monitoring for ResNet152
+    # DEFAULT to resource_monitoring for ResNet152
     trainer_stats = getattr(conf, 'trainer_stats', 'resource_monitoring')
     
     # Handle legacy 'no-op' -> 'noop' or 'resource_monitoring'
+    # if trainer_stats == 'no-op':
+    #     print("[ResNet152] Detected 'no-op', using 'resource_monitoring' instead")
+    #     trainer_stats = 'resource_monitoring'
+    #     conf.trainer_stats = 'resource_monitoring'
+    # elif trainer_stats == 'noop':
+    #     print("[ResNet152] Using 'noop' (no statistics). Consider using 'resource_monitoring' for full stats.")
+    # else:
+    #     print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
+    #     conf.trainer_stats = trainer_stats
+
+    # Carbon tracker
     if trainer_stats == 'no-op':
-        print("[ResNet152] Detected 'no-op', using 'resource_monitoring' instead")
-        trainer_stats = 'resource_monitoring'
-        conf.trainer_stats = 'resource_monitoring'
+        print("[ResNet152] Detected 'no-op', using 'carbon_tracker' instead")
+        trainer_stats = 'carbon_tracker'
+        conf.trainer_stats = 'carbon_tracker'
     elif trainer_stats == 'noop':
-        print("[ResNet152] Using 'noop' (no statistics). Consider using 'resource_monitoring' for full stats.")
+        print("[ResNet152] Using 'carbon_tracker' for carbon monitoring")
+        trainer_stats = 'carbon_tracker'
+        conf.trainer_stats = 'carbon_tracker'
     else:
         print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
         conf.trainer_stats = trainer_stats
-    
+
+    #  Combined tracker
+    # if trainer_stats == 'no-op':
+    #     print("[ResNet152] Detected 'no-op', using 'combined_stats' instead")
+    #     trainer_stats = 'combined_stats'
+    #     conf.trainer_stats = 'combined_stats'
+    # elif trainer_stats == 'noop':
+    #     print("[ResNet152] Using 'combined_stats' for full monitoring (GPU/RAM + Carbon)")
+    #     trainer_stats = 'combined_stats'
+    #     conf.trainer_stats = 'combined_stats'
+    # else:
+    #     print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
+    #     conf.trainer_stats = trainer_stats
+
+    # marlena script
+    # if trainer_stats == 'no-op':
+    #     print("[ResNet152] Detected 'no-op', using 'basic_resources_stats' instead")
+    #     trainer_stats = 'basic_resources_stats'
+    #     conf.trainer_stats = 'basic_resources_stats'
+    # elif trainer_stats == 'noop':
+    #     print("[ResNet152] Using 'noop' (no statistics). Consider using 'resource_monitoring' for full stats.")
+    # else:
+    #     print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
+    #     conf.trainer_stats = trainer_stats
+
+
     stats = stats_mod.init_from_conf(conf)
 
     # 6) Create trainer
