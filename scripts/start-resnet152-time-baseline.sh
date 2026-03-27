@@ -5,9 +5,9 @@
 
 SCRIPTS_DIR=$(readlink -f -n $(dirname $0))
 
-BATCH_MAX=64   # <-- set your max power-of-2 batch size
-BATCH_MID=32   # <-- half of max
-BATCH_MIN=16   # <-- quarter of max
+BATCH_MAX=128   # <-- set your max power-of-2 batch size
+BATCH_MID=64   # <-- half of max
+BATCH_MIN=32   # <-- quarter of max
 
 for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
     echo "=== Running end-to-end time baseline, batch_size=${BS} ==="
