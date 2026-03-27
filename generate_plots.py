@@ -9,8 +9,8 @@ Usage:
     python generate_plots.py [csv_file] [output_png]
     
 Examples:
-    python generate_plots.py stats.csv training_metrics.png
-    python generate_plots.py training_stats_backup/stats.csv training_metrics.png
+    python generate_plots.py stats.csv training_metrics_l.png
+    python generate_plots.py training_stats_backup/stats.csv training_metrics_l.png
     python generate_plots.py  # Uses default paths
 """
 
@@ -23,7 +23,7 @@ from pathlib import Path
 
 
 def generate_plots(csv_file="training_stats_backup/stats.csv", 
-                   output_file="training_stats_backup/training_metrics.png"):
+                   output_file="training_stats_backup/training_metrics_l.png"):
     """Generate training metrics plots from CSV file.
     
     Args:
@@ -50,7 +50,6 @@ def generate_plots(csv_file="training_stats_backup/stats.csv",
     gpu_util = df['gpu_utilization'].values
     gpu_mem = df['gpu_memory_used_mb'].values
     sys_mem = df['system_memory_used_mb'].values
-    loss = df['loss'].values
     throughput = df['samples_per_sec'].values
     
     # Calculate X-axis range
@@ -59,8 +58,8 @@ def generate_plots(csv_file="training_stats_backup/stats.csv",
     
     print(f"X-axis range: {x_min} to {x_max}")
     
-    # Create 2x3 figure
-    fig, axes = plt.subplots(2, 3, figsize=(18, 10))
+    # Create 2x2 figure
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
     fig.suptitle('ResNet152 Training Metrics', fontsize=16, fontweight='bold')
     
     # Plot 1: GPU Utilization
@@ -83,49 +82,34 @@ def generate_plots(csv_file="training_stats_backup/stats.csv",
     axes[0, 1].set_title('GPU Memory Usage')
     axes[0, 1].grid(True, alpha=0.3)
     axes[0, 1].set_xlim(x_min, x_max)
-    # Auto-adjust Y-axis for better visibility
     avg_mem = gpu_mem.mean()
     axes[0, 1].axhline(y=avg_mem, color='r', linestyle='--',
                        label=f'Average: {avg_mem:.0f} MB', alpha=0.7)
     axes[0, 1].legend()
     
     # Plot 3: System Memory (RAM)
-    axes[0, 2].plot(steps, sys_mem, 'orange', linewidth=1.5, alpha=0.7)
-    axes[0, 2].set_xlabel('Training Step')
-    axes[0, 2].set_ylabel('System Memory (MB)')
-    axes[0, 2].set_title('System Memory (RAM) Usage')
-    axes[0, 2].grid(True, alpha=0.3)
-    axes[0, 2].set_xlim(x_min, x_max)
-    # Auto-adjust Y-axis for better visibility
-    avg_sys_mem = sys_mem.mean()
-    axes[0, 2].axhline(y=avg_sys_mem, color='r', linestyle='--',
-                       label=f'Average: {avg_sys_mem:.0f} MB', alpha=0.7)
-    axes[0, 2].legend()
-    
-    # Plot 4: Training Loss
-    axes[1, 0].plot(steps, loss, 'r-', linewidth=1.5, alpha=0.7)
+    axes[1, 0].plot(steps, sys_mem, 'orange', linewidth=1.5, alpha=0.7)
     axes[1, 0].set_xlabel('Training Step')
-    axes[1, 0].set_ylabel('Loss')
-    axes[1, 0].set_title('Training Loss')
+    axes[1, 0].set_ylabel('System Memory (MB)')
+    axes[1, 0].set_title('System Memory (RAM) Usage')
     axes[1, 0].grid(True, alpha=0.3)
     axes[1, 0].set_xlim(x_min, x_max)
-    # Auto-adjust Y-axis for better visibility
+    avg_sys_mem = sys_mem.mean()
+    axes[1, 0].axhline(y=avg_sys_mem, color='r', linestyle='--',
+                       label=f'Average: {avg_sys_mem:.0f} MB', alpha=0.7)
+    axes[1, 0].legend()
     
-    # Plot 5: Throughput
+    # Plot 4: Throughput
     axes[1, 1].plot(steps, throughput, 'm-', linewidth=1.5, alpha=0.7)
     axes[1, 1].set_xlabel('Training Step')
     axes[1, 1].set_ylabel('Throughput (samples/sec)')
     axes[1, 1].set_title('Training Throughput')
     axes[1, 1].grid(True, alpha=0.3)
     axes[1, 1].set_xlim(x_min, x_max)
-    # Auto-adjust Y-axis for better visibility
     avg_throughput = throughput.mean()
     axes[1, 1].axhline(y=avg_throughput, color='r', linestyle='--',
                        label=f'Average: {avg_throughput:.1f} samples/s', alpha=0.7)
     axes[1, 1].legend()
-    
-    # Plot 6: Empty
-    axes[1, 2].axis('off')
     
     plt.tight_layout()
     
@@ -142,7 +126,6 @@ def generate_plots(csv_file="training_stats_backup/stats.csv",
     print(f"  GPU Mem: {avg_mem:.0f} MB")
     print(f"  RAM: {avg_sys_mem:.0f} MB")
     print(f"  Throughput: {avg_throughput:.1f} samples/s")
-    print(f"  Avg Loss: {loss.mean():.4f}")
 
 
 def main():
@@ -151,11 +134,11 @@ def main():
     if len(sys.argv) == 1:
         # No arguments - use defaults
         csv_file = "training_stats_backup/stats.csv"
-        output_file = "training_stats_backup/training_metrics.png"
+        output_file = "training_stats_backup/training_metrics_l.png"
     elif len(sys.argv) == 2:
         # Only CSV file provided
         csv_file = sys.argv[1]
-        output_file = str(Path(csv_file).parent / "training_metrics.png")
+        output_file = str(Path(csv_file).parent / "training_metrics_l.png")
     elif len(sys.argv) == 3:
         # Both CSV and output file provided
         csv_file = sys.argv[1]

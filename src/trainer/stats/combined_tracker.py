@@ -467,7 +467,7 @@ class CombinedStats(TrainerStats):
         print(f"  Local backup: ./training_stats_backup/")
         print(f"{'='*70}\n")
     
-    def start_step(self):
+    def start_step(self, **kwargs):
         """Start tracking step."""
         self.step_start_time = time.time()
         self.step_count += 1
@@ -577,15 +577,8 @@ class CombinedStats(TrainerStats):
             self.current_stats['samples_per_sec'] = batch_size / self.current_stats['step_time_sec']
     
     def log_loss(self, loss, **kwargs):
-        if torch.is_tensor(loss):
-            self.current_stats['loss'] = float(loss.item())
-        else:
-            self.current_stats['loss'] = loss
-        
-        self.losses.append({
-            "step": self.step_count,
-            "loss": self.current_stats['loss']
-        })
+        """Log the loss value. Disabled to avoid GPU-CPU sync overhead."""
+        pass
     
     def log_stats(self, **kwargs):
         self.current_stats.update(kwargs)

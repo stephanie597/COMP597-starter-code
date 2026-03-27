@@ -218,7 +218,7 @@ class CarbonTracker(TrainerStats):
         except Exception as e:
             print(f"[CarbonTracker] Error in stop_train: {e}")
     
-    def start_step(self):
+    def start_step(self, **kwargs):
         """Start tracking emissions for this training step."""
         if not self.enabled:
             return
@@ -335,58 +335,78 @@ class CarbonTracker(TrainerStats):
                 print("[CarbonTracker] Empty emissions data, skipping plots")
                 return
             
-            # Extract data
+            # Extract data - use diff() to get per-step values from cumulative data
             steps = list(range(1, len(df) + 1))
-            emissions = df['emissions'].values * 1000  # Convert to grams CO2
-            energy = df['energy_consumed'].values * 1000  # Convert to Wh
+            import numpy as np
+            
+            # Per-step values (diff of cumulative)
+            emissions_cumul = df['emissions'].values * 1000  # kg -> g CO2
+            energy_cumul = df['energy_consumed'].values * 1e6  # kWh -> mWh
+            
+            emissions_per_step = np.diff(emissions_cumul, prepend=0)
+            energy_per_step = np.diff(energy_cumul, prepend=0)
+            
+            # Cumulative values for cumulative plots
+            emissions_cumul_g = emissions_cumul
+            energy_cumul_mwh = energy_cumul
             
             # Calculate X-axis range
             max_step = max(steps) if steps else len(df)
             x_min, x_max = 0, max_step
             
-            # Create figure with 2 subplots
-            fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+            # Create figure with 2x2 subplots
+            fig, axes = plt.subplots(2, 2, figsize=(14, 10))
             fig.suptitle('Carbon Emissions Tracking', fontsize=16, fontweight='bold')
             
-            # Plot 1: CO2 Emissions
-            axes[0].plot(steps, emissions, 'g-', linewidth=1.5, alpha=0.7)
-            axes[0].set_xlabel('Training Step')
-            axes[0].set_ylabel('CO2 Emissions (g CO2eq)')
-            axes[0].set_title('Carbon Emissions per Step')
-            axes[0].grid(True, alpha=0.3)
-            axes[0].set_xlim(x_min, x_max)  # Set X-axis range
-            # Auto-adjust Y-axis for better visibility
-            
-            if len(emissions) > 0:
-                total_emissions = emissions.sum()
-                avg_emissions = emissions.mean()
-                axes[0].axhline(y=avg_emissions, color='r', linestyle='--',
-                               label=f'Avg: {avg_emissions:.4f} g/step', alpha=0.7)
-                axes[0].text(0.98, 0.98, f'Total: {total_emissions:.2f} g CO2eq',
-                            transform=axes[0].transAxes,
-                            ha='right', va='top',
-                            bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
-                axes[0].legend()
-            
-            # Plot 2: Energy Consumption
-            axes[1].plot(steps, energy, 'b-', linewidth=1.5, alpha=0.7)
-            axes[1].set_xlabel('Training Step')
-            axes[1].set_ylabel('Energy Consumed (Wh)')
-            axes[1].set_title('Energy Consumption per Step')
-            axes[1].grid(True, alpha=0.3)
-            axes[1].set_xlim(x_min, x_max)  # Set X-axis range
-            # Auto-adjust Y-axis for better visibility
-            
-            if len(energy) > 0:
-                total_energy = energy.sum()
-                avg_energy = energy.mean()
-                axes[1].axhline(y=avg_energy, color='r', linestyle='--',
-                               label=f'Avg: {avg_energy:.4f} Wh/step', alpha=0.7)
-                axes[1].text(0.98, 0.98, f'Total: {total_energy:.2f} Wh',
-                            transform=axes[1].transAxes,
-                            ha='right', va='top',
-                            bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.5))
-                axes[1].legend()
+            # Plot 1: CO2 Emissions per step
+            axes[0, 0].plot(steps, emissions_per_step, 'g-', linewidth=1, alpha=0.7)
+            axes[0, 0].set_xlabel('Training Step')
+            axes[0, 0].set_ylabel('CO2 Emissions (g CO2eq/step)')
+            axes[0, 0].set_title('Carbon Emissions per Step')
+            axes[0, 0].grid(True, alpha=0.3)
+            axes[0, 0].set_xlim(x_min, x_max)
+            avg_emissions = emissions_per_step.mean()
+            axes[0, 0].axhline(y=avg_emissions, color='r', linestyle='--',
+                               label=f'Avg: {avg_emissions:.6f} g/step', alpha=0.7)
+            axes[0, 0].legend()
+
+            # Plot 2: Energy per step
+            axes[0, 1].plot(steps, energy_per_step, 'b-', linewidth=1, alpha=0.7)
+            axes[0, 1].set_xlabel('Training Step')
+            axes[0, 1].set_ylabel('Energy Consumed (mWh/step)')
+            axes[0, 1].set_title('Energy Consumption per Step')
+            axes[0, 1].grid(True, alpha=0.3)
+            axes[0, 1].set_xlim(x_min, x_max)
+            avg_energy = energy_per_step.mean()
+            axes[0, 1].axhline(y=avg_energy, color='r', linestyle='--',
+                               label=f'Avg: {avg_energy:.4f} mWh/step', alpha=0.7)
+            axes[0, 1].legend()
+
+            # Plot 3: Cumulative CO2
+            axes[1, 0].plot(steps, emissions_cumul_g, 'g-', linewidth=1.5, alpha=0.7)
+            axes[1, 0].set_xlabel('Training Step')
+            axes[1, 0].set_ylabel('Cumulative CO2 (g CO2eq)')
+            axes[1, 0].set_title('Cumulative Carbon Emissions')
+            axes[1, 0].grid(True, alpha=0.3)
+            axes[1, 0].set_xlim(x_min, x_max)
+            total_emissions = emissions_cumul_g[-1]
+            axes[1, 0].text(0.98, 0.02, f'Total: {total_emissions:.4f} g CO2eq',
+                           transform=axes[1, 0].transAxes,
+                           ha='right', va='bottom',
+                           bbox=dict(boxstyle='round', facecolor='wheat', alpha=0.5))
+
+            # Plot 4: Cumulative Energy
+            axes[1, 1].plot(steps, energy_cumul_mwh, 'b-', linewidth=1.5, alpha=0.7)
+            axes[1, 1].set_xlabel('Training Step')
+            axes[1, 1].set_ylabel('Cumulative Energy (mWh)')
+            axes[1, 1].set_title('Cumulative Energy Consumption')
+            axes[1, 1].grid(True, alpha=0.3)
+            axes[1, 1].set_xlim(x_min, x_max)
+            total_energy = energy_cumul_mwh[-1]
+            axes[1, 1].text(0.98, 0.02, f'Total: {total_energy:.2f} mWh',
+                           transform=axes[1, 1].transAxes,
+                           ha='right', va='bottom',
+                           bbox=dict(boxstyle='round', facecolor='lightblue', alpha=0.5))
             
             plt.tight_layout()
             

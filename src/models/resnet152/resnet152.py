@@ -1,7 +1,6 @@
 """ResNet152 model implementation for the training framework."""
 
 from typing import Any, Dict, Optional, Tuple
-from types import SimpleNamespace
 
 import torch
 import torch.nn as nn
@@ -13,48 +12,35 @@ import torchvision.models as tvmodels
 import src.config as config
 import src.trainer.stats as stats_mod
 from src.trainer.simple import SimpleTrainer
+from src.trainer.resnet_simple import ResNetSimpleTrainer
 from src.trainer.base import Trainer
 
 
-class ResNetWithLoss(nn.Module):
-    """
-    Wrap torchvision ResNet to return an object with .loss attribute.
-    """
+_transform = transforms.Compose([
+    transforms.RandomResizedCrop(224),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+])
 
-    def __init__(self, backbone: nn.Module, num_classes: int):
-        super().__init__()
-        self.backbone = backbone
-        self.criterion = nn.CrossEntropyLoss()
-        self.num_classes = num_classes
-
-    def forward(self, pixel_values: torch.Tensor, labels: torch.Tensor, **kwargs):
-        logits = self.backbone(pixel_values)
-        loss = self.criterion(logits, labels)
-        return SimpleNamespace(loss=loss, logits=logits)
+def collate_fn(batch):
+    """Convert ImageFolder format to PyTorch tensors."""
+    images = torch.stack([_transform(item[0]) for item in batch], dim=0)
+    labels = torch.tensor([item[1] for item in batch], dtype=torch.long)
+    return (images, labels)
 
 
 def _make_dataloader(conf: config.Config, dataset: data.Dataset) -> data.DataLoader:
     """Create a DataLoader for ResNet152 training."""
-    
-    transform = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
-        transforms.ToTensor(),
-    ])
-
-    def collate_fn(batch):
-        """Convert HuggingFace dataset format to PyTorch tensors."""
-        images = torch.stack([transform(item["image"]) for item in batch], dim=0)
-        labels = torch.tensor([int(item["label"]) for item in batch], dtype=torch.long)
-        return {"pixel_values": images, "labels": labels}
 
     batch_size = getattr(conf, "batch_size", 4)
+    num_workers = getattr(conf.data_configs.dataset, 'load_num_proc', 1)
     
     return data.DataLoader(
         dataset,
         batch_size=batch_size,
         shuffle=True,
-        num_workers=0,
+        num_workers=num_workers,
         pin_memory=torch.cuda.is_available(),
         drop_last=True,
         collate_fn=collate_fn,
@@ -71,14 +57,12 @@ def resnet152_init(conf: config.Config, dataset: data.Dataset) -> Tuple[Trainer,
 
     # 1) Create model
     print("[ResNet152] Loading ResNet152 backbone...")
-    backbone = tvmodels.resnet152(weights=None)
-    num_classes = backbone.fc.out_features
+    backbone = tvmodels.resnet152(weights="DEFAULT")
     # num_classes = len(dataset.features["label"].names)
     # backbone.fc = nn.Linear(backbone.fc.in_features, num_classes)
-    
-    model = ResNetWithLoss(backbone, num_classes=num_classes)
-    model = model.to(device)
-    print(f"[ResNet152] Model loaded with {num_classes} output classes")
+    model = backbone.to(device)
+    model.device = device
+    print(f"[ResNet152] Model loaded with pretrained weights")
 
     # 2) Create data loader
     print(f"[ResNet152] Creating data loader (batch_size={getattr(conf, 'batch_size', 4)})...")
@@ -88,38 +72,35 @@ def resnet152_init(conf: config.Config, dataset: data.Dataset) -> Tuple[Trainer,
     # 3) Create optimizer
     learning_rate = getattr(conf, "learning_rate", 1e-6)
     print(f"[ResNet152] Creating SGD optimizer (lr={learning_rate})...")
-    optimizer = optim.SGD(model.parameters(), lr=learning_rate, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
-    # 4) Create learning rate scheduler
-    lr_scheduler = optim.lr_scheduler.LambdaLR(optimizer, lr_lambda=lambda step: 1.0)
-
-    # 5) Create statistics tracker
+    # 4) Create statistics tracker
     # DEFAULT to resource_monitoring for ResNet152
     trainer_stats = getattr(conf, 'trainer_stats', 'resource_monitoring')
     
     # Handle legacy 'no-op' -> 'noop' or 'resource_monitoring'
-    # if trainer_stats == 'no-op':
-    #     print("[ResNet152] Detected 'no-op', using 'resource_monitoring' instead")
-    #     trainer_stats = 'resource_monitoring'
-    #     conf.trainer_stats = 'resource_monitoring'
-    # elif trainer_stats == 'noop':
-    #     print("[ResNet152] Using 'noop' (no statistics). Consider using 'resource_monitoring' for full stats.")
-    # else:
-    #     print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
-    #     conf.trainer_stats = trainer_stats
-
-    # Carbon tracker
     if trainer_stats == 'no-op':
-        print("[ResNet152] Detected 'no-op', using 'carbon_tracker' instead")
-        trainer_stats = 'carbon_tracker'
-        conf.trainer_stats = 'carbon_tracker'
+        print("[ResNet152] Detected 'no-op', using 'resource_monitoring' instead")
+        trainer_stats = 'resource_monitoring'
+        conf.trainer_stats = 'resource_monitoring'
     elif trainer_stats == 'noop':
-        print("[ResNet152] Using 'carbon_tracker' for carbon monitoring")
-        trainer_stats = 'carbon_tracker'
-        conf.trainer_stats = 'carbon_tracker'
+        print("[ResNet152] Using 'noop' (no statistics). Consider using 'resource_monitoring' for full stats.")
     else:
         print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
         conf.trainer_stats = trainer_stats
+
+    # Carbon tracker
+    # if trainer_stats == 'no-op':
+    #     print("[ResNet152] Detected 'no-op', using 'carbon_tracker' instead")
+    #     trainer_stats = 'carbon_tracker'
+    #     conf.trainer_stats = 'carbon_tracker'
+    # elif trainer_stats == 'noop':
+    #     print("[ResNet152] Using 'carbon_tracker' for carbon monitoring")
+    #     trainer_stats = 'carbon_tracker'
+    #     conf.trainer_stats = 'carbon_tracker'
+    # else:
+    #     print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
+    #     conf.trainer_stats = trainer_stats
 
     #  Combined tracker
     # if trainer_stats == 'no-op':
@@ -145,16 +126,15 @@ def resnet152_init(conf: config.Config, dataset: data.Dataset) -> Tuple[Trainer,
     #     print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
     #     conf.trainer_stats = trainer_stats
 
+    stats = stats_mod.init_from_conf(conf, device=device)
 
-    stats = stats_mod.init_from_conf(conf)
-
-    # 6) Create trainer
-    print("[ResNet152] Creating SimpleTrainer...")
-    trainer = SimpleTrainer(
+    # 5) Create trainer
+    print("[ResNet152] Creating ResNetSimpleTrainer...")
+    trainer = ResNetSimpleTrainer(
         loader=loader,
         model=model,
         optimizer=optimizer,
-        lr_scheduler=lr_scheduler,
+        lr_scheduler=None,
         device=device,
         stats=stats,
         conf=conf,
