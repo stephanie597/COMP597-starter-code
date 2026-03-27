@@ -75,16 +75,12 @@ def resnet152_init(conf: config.Config, dataset: data.Dataset) -> Tuple[Trainer,
     optimizer = optim.SGD(model.parameters(), lr=learning_rate)
 
     # 4) Create statistics tracker
-    # DEFAULT to resource_monitoring for ResNet152
-    trainer_stats = getattr(conf, 'trainer_stats', 'resource_monitoring')
-    
-    # Handle legacy 'no-op' -> 'noop' or 'resource_monitoring'
-    if trainer_stats == 'no-op':
-        print("[ResNet152] Detected 'no-op', using 'resource_monitoring' instead")
-        trainer_stats = 'resource_monitoring'
-        conf.trainer_stats = 'resource_monitoring'
-    elif trainer_stats == 'noop':
-        print("[ResNet152] Using 'noop' (no statistics). Consider using 'resource_monitoring' for full stats.")
+    trainer_stats = getattr(conf, 'trainer_stats', 'basic_resources_stats')
+
+    if trainer_stats in ('no-op', 'noop'):
+        print("[ResNet152] Detected 'no-op', using 'basic_resources_stats' instead")
+        trainer_stats = 'basic_resources_stats'
+        conf.trainer_stats = 'basic_resources_stats'
     else:
         print(f"[ResNet152] Using trainer_stats: {trainer_stats}")
         conf.trainer_stats = trainer_stats
