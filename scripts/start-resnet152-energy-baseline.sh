@@ -1,16 +1,15 @@
 #!/bin/bash
 # Experiment 2: End-to-end energy baseline (single CodeCarbon measurement)
-
+ 
 SCRIPTS_DIR=$(readlink -f -n $(dirname $0))
-
+ 
 BATCH_MAX=128
 BATCH_MID=64
 BATCH_MIN=32
-
-OUTPUT_DIR="${HOME}/COMP597-starter-code/results/energy_baseline_logs"
-mkdir -p ${OUTPUT_DIR}
-
+ 
 for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
+    OUTPUT_DIR="${HOME}/COMP597-starter-code/results/energy_baseline_logs/bs${BS}"
+    mkdir -p ${OUTPUT_DIR}
     echo "=== Running end-to-end energy baseline, batch_size=${BS} ==="
     for RUN in 1 2 3; do
         echo "--- Run ${RUN}/3 ---"
