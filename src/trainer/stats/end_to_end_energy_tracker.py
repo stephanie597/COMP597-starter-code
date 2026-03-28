@@ -115,6 +115,7 @@ class EndToEndEnergyStats(base.TrainerStats):
             output_handlers=[_CSVAppendOutput(csv_name, output_dir)],
             allow_multiple_runs=True,
             log_level="warning",
+            measure_power_secs=0.5,
             gpu_ids=[self.gpu_id],
         )
         print(f"[EnergyBaseline] Initialised. Output → {output_dir}/{csv_name}")
