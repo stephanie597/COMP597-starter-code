@@ -1,14 +1,14 @@
 #!/bin/bash
-# Experiment 2: End-to-end energy baseline (single CodeCarbon measurement, minimal overhead)
-# Replace BATCH_MAX, BATCH_MID, BATCH_MIN with your 3 chosen batch sizes (powers of 2).
+# Experiment 2: End-to-end energy baseline (single CodeCarbon measurement)
 
 SCRIPTS_DIR=$(readlink -f -n $(dirname $0))
 
-BATCH_MAX=128   # <-- set your max power-of-2 batch size
-BATCH_MID=64   # <-- half of max
-BATCH_MIN=32   # <-- quarter of max
+BATCH_MAX=128
+BATCH_MID=64
+BATCH_MIN=32
 
-OUTPUT_DIR='${COMP597_JOB_STUDENT_STORAGE_DIR}/resnet/energy_baseline_logs'
+OUTPUT_DIR="${HOME}/COMP597-starter-code/results/energy_baseline_logs"
+mkdir -p ${OUTPUT_DIR}
 
 for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
     echo "=== Running end-to-end energy baseline, batch_size=${BS} ==="
@@ -28,4 +28,3 @@ for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
             --trainer_stats_configs.codecarbon.output_dir ${OUTPUT_DIR}
     done
 done
-
