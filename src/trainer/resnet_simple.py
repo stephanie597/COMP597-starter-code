@@ -1,8 +1,13 @@
-"""ResNet152 trainer with 5-minute timed training loop.
+"""ResNet152 trainer with fixed-step training loop.
 
 Wraps SimpleTrainer and overrides the training loop to run for a fixed
-duration (default 5 minutes) rather than a fixed number of epochs.
-This matches the experimental protocol required by the course project.
+number of steps rather than a fixed duration. The number of steps is
+determined from an uninstrumented time baseline run, so that all
+experiments (with and without instrumentation) run for exactly the same
+number of steps. This makes it easy to measure instrumentation overhead
+by comparing wall-clock time across conditions.
+
+Target: approximately 5 minutes of training per configuration.
 """
 
 import time
@@ -17,17 +22,28 @@ import src.config as config
 import src.trainer.stats as stats
 from src.trainer.simple import SimpleTrainer
 
-# Target training duration in seconds (5 minutes as required)
-_TRAIN_DURATION_SEC = 300
+# Fixed number of steps per batch size, determined from uninstrumented
+# time baseline runs (~5 minutes each).
+# BS 128: ~600 ms/step → 300s / 0.600 = 500 steps
+# BS 64:  ~270 ms/step → 300s / 0.270 = 1111 steps
+# BS 32:  ~121 ms/step → 300s / 0.121 = 2479 steps
+_STEPS_PER_BS = {
+    128: 500,
+    64:  1111,
+    32:  2479,
+}
+
+# Default fallback if batch size not in the table
+_DEFAULT_STEPS = 500
 
 
 class ResNetSimpleTrainer(SimpleTrainer):
-    """ResNet152 trainer that runs for a fixed wall-clock duration.
+    """ResNet152 trainer that runs for a fixed number of steps.
 
-    Instead of stopping after one pass through the dataset, the training
-    loop repeats over the dataloader until the target duration is reached.
-    This ensures all experiments produce comparable 5-minute measurements
-    regardless of batch size or dataset size.
+    Instead of stopping after a wall-clock deadline, the training loop
+    runs for exactly `max_steps` steps. This ensures that experiments
+    with and without instrumentation perform the same amount of work,
+    making overhead measurement straightforward.
     """
 
     def __init__(
@@ -39,7 +55,7 @@ class ResNetSimpleTrainer(SimpleTrainer):
         device: torch.device,
         stats: stats.TrainerStats,
         conf: Optional[config.Config] = None,
-        train_duration_sec: int = _TRAIN_DURATION_SEC,
+        max_steps: Optional[int] = None,
     ):
         super().__init__(
             loader=loader,
@@ -50,8 +66,15 @@ class ResNetSimpleTrainer(SimpleTrainer):
             stats=stats,
             conf=conf,
         )
-        self.train_duration_sec = train_duration_sec
         self._criterion = nn.CrossEntropyLoss().to(self.model.device)
+
+        # Determine max_steps from batch size if not explicitly provided
+        if max_steps is not None:
+            self.max_steps = max_steps
+        else:
+            bs = loader.batch_size if loader.batch_size is not None else _DEFAULT_STEPS
+            self.max_steps = _STEPS_PER_BS.get(bs, _DEFAULT_STEPS)
+            print(f"[ResNetTrainer] batch_size={bs} → max_steps={self.max_steps}")
 
     @override
     def process_batch(self, i: int, batch: Any) -> Any:
@@ -75,11 +98,11 @@ class ResNetSimpleTrainer(SimpleTrainer):
 
     @override
     def train(self, model_kwargs: Optional[Dict[str, Any]]) -> None:
-        """Run training for a fixed duration of 5 minutes.
+        """Run training for a fixed number of steps.
 
-        The dataloader is iterated repeatedly until the wall-clock time
-        exceeds `train_duration_sec`. Each complete pass through the data
-        is counted as one epoch.
+        The dataloader is iterated repeatedly until `max_steps` steps
+        have been completed. Each complete pass through the data is
+        counted as one epoch.
 
         Parameters
         ----------
@@ -87,23 +110,27 @@ class ResNetSimpleTrainer(SimpleTrainer):
             Extra keyword arguments forwarded to the model's forward pass.
         """
         t_start = time.perf_counter()
-        deadline = t_start + self.train_duration_sec
 
         global_step = 0
         epoch = 0
 
-        progress_bar = tqdm.auto.tqdm(desc="Training (5 min)", unit="step")
+        progress_bar = tqdm.auto.tqdm(
+            total=self.max_steps,
+            desc=f"Training ({self.max_steps} steps)",
+            unit="step"
+        )
 
         self.stats.start_train()
 
-        while time.perf_counter() < deadline:
+        while global_step < self.max_steps:
             epoch += 1
             for i, batch in enumerate(self.loader):
-                # Stop cleanly at the 5-minute mark
-                if time.perf_counter() >= deadline:
+                if global_step >= self.max_steps:
                     break
 
-                self.stats.start_step(batch_size=len(batch[0]) if isinstance(batch, (list, tuple)) else len(batch))
+                self.stats.start_step(
+                    batch_size=len(batch[0]) if isinstance(batch, (list, tuple)) else len(batch)
+                )
                 loss, descr = self.step(global_step, batch, model_kwargs)
                 self.stats.stop_step()
 
