@@ -54,7 +54,6 @@ class ResourceMonitor(base.TrainerStats):
         self.device = device
         self._proc = psutil.Process(os.getpid())
         self._run_id = int(time.time())
-        self._gpu_mem_baseline_mb: float = 0.0
 
         # NVML handle for GPU utilisation
         if torch.cuda.is_available():
@@ -98,7 +97,7 @@ class ResourceMonitor(base.TrainerStats):
 
     def _gpu_mem_mb(self) -> float:
         if self._gpu_handle:
-            return pynvml.nvmlDeviceGetMemoryInfo(self._gpu_handle).used / 1024 ** 2 - self._gpu_mem_baseline_mb
+            return pynvml.nvmlDeviceGetMemoryInfo(self._gpu_handle).used / 1024 ** 2
         return 0.0
 
     def _gpu_util_pct(self) -> float:
@@ -120,8 +119,6 @@ class ResourceMonitor(base.TrainerStats):
 
     def start_train(self) -> None:
         self._t_train_start = time.perf_counter()
-        if self._gpu_handle:
-            self._gpu_mem_baseline_mb = pynvml.nvmlDeviceGetMemoryInfo(self._gpu_handle).used / 1024 ** 2
         self._step_fh  = open(self._step_csv,  mode="w", newline="")
         self._phase_fh = open(self._phase_csv, mode="w", newline="")
         print(f"[ResourceMonitor] Logging to {self._out}")
@@ -135,6 +132,14 @@ class ResourceMonitor(base.TrainerStats):
             pynvml.nvmlShutdown()
 
         elapsed = time.perf_counter() - self._t_train_start
+
+        # Write total training time to separate CSV
+        total_csv = self._out / f"total_time_{self._run_id}.csv"
+        with open(total_csv, "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=["total_time_sec"])
+            w.writeheader()
+            w.writerow({"total_time_sec": elapsed})
+
         print(f"[ResourceMonitor] Training finished in {elapsed:.3f}s")
         print(f"[ResourceMonitor] Generating plots …")
         self._plot_timelines()
@@ -148,7 +153,7 @@ class ResourceMonitor(base.TrainerStats):
     def start_step(self, batch_size: int = None) -> None:
         if batch_size is not None:
             self._batch_size = batch_size
-        self._sync()
+        #self._sync()
         self._t_step_start = time.perf_counter()
 
     def stop_step(self) -> None:
@@ -322,4 +327,3 @@ class ResourceMonitor(base.TrainerStats):
     def log_step(self) -> None: pass
     def log_loss(self, loss: torch.Tensor) -> None: pass
     def log_stats(self) -> None: pass
-

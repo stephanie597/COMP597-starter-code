@@ -28,9 +28,9 @@ from src.trainer.simple import SimpleTrainer
 # BS 64:  ~270 ms/step → 300s / 0.270 = 1111 steps
 # BS 32:  ~121 ms/step → 300s / 0.121 = 2479 steps
 _STEPS_PER_BS = {
-    128: 500,
-    64:  1111,
-    32:  2479,
+    128: 550,#556,  # trial: 71,168 samples #500, 
+    64:  1100,#1111,
+    32:  2200,#2479,
 }
 
 # Default fallback if batch size not in the table
@@ -121,10 +121,12 @@ class ResNetSimpleTrainer(SimpleTrainer):
         )
 
         self.stats.start_train()
-
+        t_before_loader = time.perf_counter() 
         while global_step < self.max_steps:
             epoch += 1
             for i, batch in enumerate(self.loader):
+                if i == 0: 
+                     print(f"[DEBUG] First batch loaded in {time.perf_counter() - t_before_loader:.3f}s")  
                 if global_step >= self.max_steps:
                     break
 

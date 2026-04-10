@@ -8,12 +8,14 @@ BATCH_MID=64
 BATCH_MIN=32
 
 # Store results in home directory so they're accessible from login node
-OUTPUT_DIR="${HOME}/COMP597-starter-code/results/basic_resources_logs_nw0_net"
+OUTPUT_DIR="${HOME}/COMP597-starter-code/results/basic_resources_logs_nw0_v2_runonetime"
 mkdir -p ${OUTPUT_DIR}
 
-for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
+#for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
+for BS in $BATCH_MID ; do
     echo "=== Running fine-grained monitoring, batch_size=${BS} ==="
-    for RUN in 1 2 3; do
+    #for RUN in 1 2 3; do
+    for RUN in 1 ; do
         echo "--- Run ${RUN}/3 ---"
         ${SCRIPTS_DIR}/srun.sh \
             --logging.level INFO \

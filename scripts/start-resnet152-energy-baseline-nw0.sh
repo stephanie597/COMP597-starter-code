@@ -8,7 +8,7 @@ BATCH_MID=64
 BATCH_MIN=32
  
 for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
-    OUTPUT_DIR="${HOME}/COMP597-starter-code/results/energy_baseline_logs/bs${BS}"
+    OUTPUT_DIR="${HOME}/COMP597-starter-code/results/energy_baseline_logs_70400/bs${BS}"
     mkdir -p ${OUTPUT_DIR}
     echo "=== Running end-to-end energy baseline, batch_size=${BS} ==="
     for RUN in 1 2 3; do

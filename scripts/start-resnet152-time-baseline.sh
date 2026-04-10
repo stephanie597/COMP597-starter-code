@@ -19,7 +19,8 @@ for BS in $BATCH_MAX $BATCH_MID $BATCH_MIN; do
             --data fakeimagenet \
             --trainer resnet_simple \
             --batch_size ${BS} \
-            --learning_rate 1e-6 \
+            --data_configs.dataset.load_num_proc 0 \
+            --learning_rate 0.01 \
             --data_configs.fakeimagenet.folder '${COMP597_JOB_STUDENT_STORAGE_DIR}/fakeimagenet/FakeImageNet/train' \
             --trainer_stats end_to_end_time_stats
     done
